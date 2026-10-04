@@ -25,7 +25,7 @@ jobs:
         run: dotnet test --no-build -c Release --filter "Category!=Docker"
       - name: All tests
         if: runner.os == 'Linux'
-        run: dotnet test --no-build -c Release
+        run: dotnet test --no-build -c Release --filter "Category!=Network"
 
   container:
     name: compose file and image build
