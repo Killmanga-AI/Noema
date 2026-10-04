@@ -1,6 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Noema.Api.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Noema.Infrastructure\Noema.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
   </ItemGroup>
   <ItemGroup>
     <!-- Only needed by the dotnet ef tools, never shipped with the app. -->

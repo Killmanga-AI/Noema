@@ -50,9 +50,12 @@ public sealed class ScanRun
 
     public string? FailureReason { get; private set; }
 
+    /// <summary>Who asked for the scan. Empty for scans created by the system.</summary>
+    public Guid? RequestedByUserId { get; private set; }
+
     public bool IsTerminal => Status is ScanStatus.Completed or ScanStatus.Failed or ScanStatus.Cancelled;
 
-    public static ScanRun Request(CidrRange target, ScanProbes probes, DateTimeOffset requestedAt)
+    public static ScanRun Request(CidrRange target, ScanProbes probes, DateTimeOffset requestedAt, Guid? requestedByUserId = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         Guard.Utc(requestedAt, nameof(requestedAt));
@@ -68,7 +71,8 @@ public sealed class ScanRun
             Target = target,
             Probes = probes,
             Status = ScanStatus.Queued,
-            RequestedAt = requestedAt
+            RequestedAt = requestedAt,
+            RequestedByUserId = requestedByUserId
         };
     }
 

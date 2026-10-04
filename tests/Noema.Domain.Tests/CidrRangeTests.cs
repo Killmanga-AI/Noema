@@ -109,4 +109,34 @@ public sealed class CidrRangeTests
         Assert.Equal(CidrRange.Parse("192.168.1.0/24"), CidrRange.Parse(" 192.168.1.0/24 "));
         Assert.NotEqual(CidrRange.Parse("192.168.1.0/24"), CidrRange.Parse("192.168.1.0/25"));
     }
+
+    [Fact]
+    public void Ranges_sort_by_family_then_address_then_prefix()
+    {
+        var sorted = new[]
+        {
+            CidrRange.Parse("fd00::/8"),
+            CidrRange.Parse("192.168.2.0/24"),
+            CidrRange.Parse("10.0.0.0/16"),
+            CidrRange.Parse("10.0.0.0/8"),
+            CidrRange.Parse("192.168.1.0/24")
+        }.OrderBy(r => r).Select(r => r.ToString()).ToArray();
+
+        Assert.Equal("10.0.0.0/8", sorted[0]);
+        Assert.Equal("10.0.0.0/16", sorted[1]);
+        Assert.Equal("192.168.1.0/24", sorted[2]);
+        Assert.Equal("192.168.2.0/24", sorted[3]);
+        Assert.Equal("fd00::/8", sorted[4]);
+    }
+
+    [Fact]
+    public void CompareTo_treats_null_as_smaller_and_equal_ranges_as_equal()
+    {
+        var range = CidrRange.Parse("10.0.0.0/8");
+
+        Assert.Equal(1, range.CompareTo((CidrRange?)null));
+        Assert.Equal(1, range.CompareTo((object?)null));
+        Assert.Equal(0, range.CompareTo(CidrRange.Parse("10.0.0.0/8")));
+        Assert.Throws<ArgumentException>(() => range.CompareTo("10.0.0.0/8"));
+    }
 }

@@ -4,11 +4,13 @@
     <Project Path="src/Noema.Agent/Noema.Agent.csproj" />
     <Project Path="src/Noema.Domain/Noema.Domain.csproj" />
     <Project Path="src/Noema.Infrastructure/Noema.Infrastructure.csproj" />
+    <Project Path="src/Noema.Scanning/Noema.Scanning.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Noema.Api.Tests/Noema.Api.Tests.csproj" />
     <Project Path="tests/Noema.Agent.Tests/Noema.Agent.Tests.csproj" />
     <Project Path="tests/Noema.Domain.Tests/Noema.Domain.Tests.csproj" />
     <Project Path="tests/Noema.Infrastructure.Tests/Noema.Infrastructure.Tests.csproj" />
+    <Project Path="tests/Noema.Scanning.Tests/Noema.Scanning.Tests.csproj" />
   </Folder>
 </Solution>

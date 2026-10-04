@@ -5,6 +5,9 @@
     </AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Noema.Scanning\Noema.Scanning.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" />

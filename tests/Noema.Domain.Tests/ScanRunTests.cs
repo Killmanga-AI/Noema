@@ -153,4 +153,13 @@ public sealed class ScanRunTests
 
         Assert.Equal(ScanRun.MaxFailureReasonLength, run.FailureReason!.Length);
     }
+
+    [Fact]
+    public void Remembers_who_requested_the_scan()
+    {
+        var requester = Guid.NewGuid();
+
+        Assert.Equal(requester, ScanRun.Request(Lan, ScanProbes.Icmp, T0, requester).RequestedByUserId);
+        Assert.Null(ScanRun.Request(Lan, ScanProbes.Icmp, T0).RequestedByUserId);
+    }
 }

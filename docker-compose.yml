@@ -29,6 +29,9 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Database__MigrateOnStartup: "true"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?set JWT_SIGNING_KEY in .env, see .env.example}
+      Bootstrap__AdminUsername: ${BOOTSTRAP_ADMIN_USERNAME:-}
+      Bootstrap__AdminPassword: ${BOOTSTRAP_ADMIN_PASSWORD:-}
       Database__ConnectionString: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
     ports:
       - "8080:8080"

@@ -19,7 +19,7 @@ namespace Noema.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -125,6 +125,110 @@ namespace Noema.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Noema.Domain.AuditEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("ActorName")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("actor_name");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("DetailJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("detail_json");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("outcome");
+
+                    b.Property<IPAddress>("RemoteAddress")
+                        .HasColumnType("inet")
+                        .HasColumnName("remote_address");
+
+                    b.Property<string>("TargetId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("TargetType")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("target_type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action")
+                        .HasDatabaseName("ix_audit_entries_action");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_audit_entries_actor_user_id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_audit_entries_occurred_at");
+
+                    b.ToTable("audit_entries", (string)null);
+                });
+
+            modelBuilder.Entity("Noema.Domain.AuthorizedRange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Range")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("range");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("Range")
+                        .IsUnique()
+                        .HasDatabaseName("ux_authorized_ranges_range");
+
+                    b.ToTable("authorized_ranges", (string)null);
+                });
+
             modelBuilder.Entity("Noema.Domain.InterfaceAddress", b =>
                 {
                     b.Property<Guid>("Id")
@@ -202,6 +306,56 @@ namespace Noema.Infrastructure.Persistence.Migrations
                     b.ToTable("observations", (string)null);
                 });
 
+            modelBuilder.Entity("Noema.Domain.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid?>("ReplacedByTokenId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("replaced_by_token_id");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_refresh_tokens_token_hash");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_refresh_tokens_user_id");
+
+                    b.ToTable("refresh_tokens", (string)null);
+                });
+
             modelBuilder.Entity("Noema.Domain.ScanRun", b =>
                 {
                     b.Property<Guid>("Id")
@@ -224,6 +378,10 @@ namespace Noema.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("RequestedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("requested_at");
+
+                    b.Property<Guid?>("RequestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requested_by_user_id");
 
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone")
@@ -257,12 +415,87 @@ namespace Noema.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Noema.Domain.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("FailedLoginCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("failed_login_count");
+
+                    b.Property<bool>("IsDisabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_disabled");
+
+                    b.Property<DateTimeOffset?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_login_at");
+
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_until");
+
+                    b.Property<DateTimeOffset>("PasswordChangedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("password_changed_at");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("password_hash");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("role");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("username");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Username")
+                        .IsUnique()
+                        .HasDatabaseName("ux_users_username");
+
+                    b.ToTable("users", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_users_failed_login_count", "failed_login_count >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Noema.Domain.AssetInterface", b =>
                 {
                     b.HasOne("Noema.Domain.Asset", null)
                         .WithMany("Interfaces")
                         .HasForeignKey("AssetId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Noema.Domain.AuthorizedRange", b =>
+                {
+                    b.HasOne("Noema.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
@@ -280,6 +513,15 @@ namespace Noema.Infrastructure.Persistence.Migrations
                     b.HasOne("Noema.Domain.ScanRun", null)
                         .WithMany()
                         .HasForeignKey("ScanRunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Noema.Domain.RefreshToken", b =>
+                {
+                    b.HasOne("Noema.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

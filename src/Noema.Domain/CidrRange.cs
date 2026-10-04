@@ -11,7 +11,7 @@ namespace Noema.Domain;
 /// A network range in CIDR notation. Parsing is deliberately strict because these values decide
 /// what the scanner is allowed to touch: no host bits, no shorthand like 10.1, no leading zeros, no scope ids.
 /// </summary>
-public sealed record CidrRange
+public sealed record CidrRange : IComparable<CidrRange>, IComparable
 {
     private static readonly Regex StrictIpv4 = new(
         "^(0|[1-9][0-9]{0,2})(\\.(0|[1-9][0-9]{0,2})){3}$",
@@ -108,6 +108,42 @@ public sealed record CidrRange
     }
 
     public override string ToString() => $"{Network}/{PrefixLength}";
+
+    /// <summary>Orders by address family, then network address, then prefix length. Needed so EF can index the column.</summary>
+    public int CompareTo(CidrRange? other)
+    {
+        if (other is null)
+        {
+            return 1;
+        }
+
+        var byFamily = Family.CompareTo(other.Family);
+        if (byFamily != 0)
+        {
+            return byFamily;
+        }
+
+        var left = Network.GetAddressBytes();
+        var right = other.Network.GetAddressBytes();
+        for (var i = 0; i < left.Length; i++)
+        {
+            var byByte = left[i].CompareTo(right[i]);
+            if (byByte != 0)
+            {
+                return byByte;
+            }
+        }
+
+        return PrefixLength.CompareTo(other.PrefixLength);
+    }
+
+    public int CompareTo(object? obj) =>
+        obj switch
+        {
+            null => 1,
+            CidrRange other => CompareTo(other),
+            _ => throw new ArgumentException($"Object must be of type {nameof(CidrRange)}.", nameof(obj))
+        };
 
     private static bool TryParseAddress(string text, [NotNullWhen(true)] out IPAddress? address)
     {
