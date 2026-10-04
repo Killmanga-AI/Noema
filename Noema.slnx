@@ -2,10 +2,13 @@
   <Folder Name="/src/">
     <Project Path="src/Noema.Api/Noema.Api.csproj" />
     <Project Path="src/Noema.Agent/Noema.Agent.csproj" />
+    <Project Path="src/Noema.Domain/Noema.Domain.csproj" />
     <Project Path="src/Noema.Infrastructure/Noema.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Noema.Api.Tests/Noema.Api.Tests.csproj" />
     <Project Path="tests/Noema.Agent.Tests/Noema.Agent.Tests.csproj" />
+    <Project Path="tests/Noema.Domain.Tests/Noema.Domain.Tests.csproj" />
+    <Project Path="tests/Noema.Infrastructure.Tests/Noema.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

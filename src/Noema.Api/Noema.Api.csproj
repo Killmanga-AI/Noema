@@ -2,4 +2,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Noema.Infrastructure\Noema.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Only needed by the dotnet ef tools, never shipped with the app. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
 </Project>

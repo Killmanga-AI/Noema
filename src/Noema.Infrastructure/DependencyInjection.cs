@@ -24,6 +24,8 @@ public static class DependencyInjection
             builder.UseNpgsql(database.ConnectionString);
         });
 
+        services.AddHostedService<DatabaseMigrationService>();
+
         services.AddHealthChecks()
             .AddDbContextCheck<NoemaDbContext>(name: "postgres", tags: [ReadyTag]);
 
