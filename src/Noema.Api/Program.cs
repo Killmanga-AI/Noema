@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Noema.Api.Features.Agents;
 using Noema.Api.Features.Audit;
 using Noema.Api.Features.Auth;
 using Noema.Api.Features.Ranges;
@@ -38,6 +39,8 @@ app.MapUserEndpoints();
 app.MapRangeEndpoints();
 app.MapScanEndpoints();
 app.MapAuditEndpoints();
+app.MapAgentAdminEndpoints();
+app.MapAgentProtocolEndpoints();
 app.MapFallback(() => Results.NotFound()).AllowAnonymous();
 
 app.Run();

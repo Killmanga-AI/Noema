@@ -172,13 +172,15 @@ public sealed class ScanEngine
             }
         }
 
+        // Scanned is counted before answered, and progress reads answered before scanned, so a report
+        // can never claim more hosts answered than addresses scanned.
+        Interlocked.Increment(ref run.Scanned);
         if (responded)
         {
             Interlocked.Increment(ref run.Responded);
         }
 
-        var scanned = Interlocked.Increment(ref run.Scanned);
-        ReportProgress(run, scanned);
+        ReportProgress(run);
     }
 
     private async ValueTask<ProbeResult> RunProbeAsync(Run run, IProbe probe, IPAddress address, CancellationToken token)
@@ -256,7 +258,7 @@ public sealed class ScanEngine
         }
     }
 
-    private static void ReportProgress(Run run, long scanned)
+    private static void ReportProgress(Run run)
     {
         if (run.Progress is null)
         {
@@ -265,7 +267,9 @@ public sealed class ScanEngine
 
         try
         {
-            run.Progress.Report(new ScanProgress(run.Planned, scanned, Interlocked.Read(ref run.Responded)));
+            var responded = Interlocked.Read(ref run.Responded);
+            var scanned = Interlocked.Read(ref run.Scanned);
+            run.Progress.Report(new ScanProgress(run.Planned, scanned, responded));
         }
         catch (Exception)
         {

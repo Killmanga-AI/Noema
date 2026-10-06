@@ -53,6 +53,22 @@ internal sealed class ScanRequestService(
             return ServiceResult<ScanDetail>.Fail(ServiceErrors.Validation(errors));
         }
 
+        Agent? pinned = null;
+        if (request.AgentId is { } agentId)
+        {
+            pinned = await db.Agents.AsNoTracking().SingleOrDefaultAsync(a => a.Id == agentId, ct);
+            if (pinned is null || pinned.IsRevoked)
+            {
+                return ServiceResult<ScanDetail>.Fail(ServiceErrors.Validation("agentId", "That agent does not exist or has been revoked."));
+            }
+
+            if (!pinned.CanServe(target!, probes))
+            {
+                return ServiceResult<ScanDetail>.Fail(ServiceErrors.Validation(
+                    "agentId", "That agent does not cover this target or does not have these probes."));
+            }
+        }
+
         var authorized = await db.AuthorizedRanges.AsNoTracking().Select(r => r.Range).ToListAsync(ct);
         var decision = ScanAuthorizationPolicy.Evaluate(target!, authorized, ScanTargetRules.MaxAddressesOrDefault(security.Value.MaxScanAddresses));
 
@@ -73,7 +89,7 @@ internal sealed class ScanRequestService(
                 : ServiceResult<ScanDetail>.Fail(ServiceErrors.Validation("target", decision.Reason!));
         }
 
-        var run = ScanRun.Request(target!, probes, time.GetUtcNow(), actor.Id);
+        var run = ScanRun.Request(target!, probes, time.GetUtcNow(), actor.Id, pinned?.Id);
         db.ScanRuns.Add(run);
         audit.Add(
             "scan.requested",
@@ -86,6 +102,65 @@ internal sealed class ScanRequestService(
         await db.SaveChangesAsync(ct);
 
         return ServiceResult<ScanDetail>.Ok(ToDetail(run));
+    }
+
+    public async Task<ServiceResult<ScanDetail>> CancelAsync(CurrentUser actor, Guid id, CancellationToken ct)
+    {
+        var run = await db.ScanRuns.SingleOrDefaultAsync(s => s.Id == id, ct);
+        if (run is null)
+        {
+            return ServiceResult<ScanDetail>.Fail(ServiceErrors.NotFound("No such scan."));
+        }
+
+        if (run.IsTerminal)
+        {
+            return ServiceResult<ScanDetail>.Fail(ServiceErrors.Conflict($"The scan has already ended as {run.Status}."));
+        }
+
+        var wasRunning = run.Status == ScanStatus.Running;
+        run.RequestCancel(time.GetUtcNow());
+        audit.Add("scan.cancel_requested", AuditOutcome.Success, actor.Id, actor.Username, "scan", run.Id.ToString(), new { wasRunning });
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ServiceResult<ScanDetail>.Fail(ServiceErrors.Conflict("The scan changed at the same moment. Look at it again and retry."));
+        }
+
+        return ServiceResult<ScanDetail>.Ok(ToDetail(run));
+    }
+
+    public async Task<ServiceResult<IReadOnlyList<ObservationDetail>>> ObservationsAsync(Guid scanId, Guid? after, int? limit, CancellationToken ct)
+    {
+        var take = limit ?? 100;
+        if (take is < 1 or > 200)
+        {
+            return ServiceResult<IReadOnlyList<ObservationDetail>>.Fail(ServiceErrors.Validation("limit", "The limit must be between 1 and 200."));
+        }
+
+        if (!await db.ScanRuns.AsNoTracking().AnyAsync(s => s.Id == scanId, ct))
+        {
+            return ServiceResult<IReadOnlyList<ObservationDetail>>.Fail(ServiceErrors.NotFound("No such scan."));
+        }
+
+        // Ids are time ordered, so paging by id walks the observations in the order they were seen.
+        // Postgres compares uuids itself, which is why the cursor query is written in SQL.
+        var items = after is { } cursor
+            ? await db.Observations
+                .FromSqlInterpolated($"SELECT * FROM observations WHERE scan_run_id = {scanId} AND id > {cursor} ORDER BY id LIMIT {take}")
+                .AsNoTracking()
+                .OrderBy(o => o.Id)
+                .ToListAsync(ct)
+            : await db.Observations.AsNoTracking().Where(o => o.ScanRunId == scanId).OrderBy(o => o.Id).Take(take).ToListAsync(ct);
+
+        IReadOnlyList<ObservationDetail> mapped = items
+            .Select(o => new ObservationDetail(o.Id, o.Kind.ToString(), o.Address.ToString(), o.MacAddress?.ToString(), o.ObservedAt, o.DetailJson))
+            .ToList();
+
+        return ServiceResult<IReadOnlyList<ObservationDetail>>.Ok(mapped);
     }
 
     public async Task<ServiceResult<ScanDetail>> GetAsync(Guid id, CancellationToken ct)
@@ -121,9 +196,23 @@ internal sealed class ScanRequestService(
         return ServiceResult<IReadOnlyList<ScanDetail>>.Ok(runs.Select(ToDetail).ToList());
     }
 
-    private static string[] ProbeNames(ScanProbes probes) =>
-        Enum.GetValues<ScanProbes>().Where(p => p != ScanProbes.None && probes.HasFlag(p)).Select(p => p.ToString()).ToArray();
+    private static string[] ProbeNames(ScanProbes probes) => ScanProbeNames.ToNames(probes);
 
     private static ScanDetail ToDetail(ScanRun run) =>
-        new(run.Id, run.Target.ToString(), ProbeNames(run.Probes), run.Status.ToString(), run.RequestedAt, run.StartedAt, run.FinishedAt, run.FailureReason, run.RequestedByUserId);
+        new(
+            run.Id,
+            run.Target.ToString(),
+            ProbeNames(run.Probes),
+            run.Status.ToString(),
+            run.RequestedAt,
+            run.StartedAt,
+            run.FinishedAt,
+            run.FailureReason,
+            run.RequestedByUserId,
+            run.RequestedAgentId,
+            run.AssignedAgentId,
+            run.IsCancelRequested,
+            run.TargetsPlanned,
+            run.TargetsScanned,
+            run.HostsResponded);
 }

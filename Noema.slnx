@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Noema.Api/Noema.Api.csproj" />
     <Project Path="src/Noema.Agent/Noema.Agent.csproj" />
+    <Project Path="src/Noema.Contracts/Noema.Contracts.csproj" />
     <Project Path="src/Noema.Domain/Noema.Domain.csproj" />
     <Project Path="src/Noema.Infrastructure/Noema.Infrastructure.csproj" />
     <Project Path="src/Noema.Scanning/Noema.Scanning.csproj" />

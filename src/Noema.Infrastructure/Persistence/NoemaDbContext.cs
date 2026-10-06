@@ -24,6 +24,10 @@ public sealed class NoemaDbContext(DbContextOptions<NoemaDbContext> options) : D
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
+    public DbSet<Agent> Agents => Set<Agent>();
+
+    public DbSet<EnrollmentToken> EnrollmentTokens => Set<EnrollmentToken>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new AssetConfiguration());
@@ -35,6 +39,8 @@ public sealed class NoemaDbContext(DbContextOptions<NoemaDbContext> options) : D
         modelBuilder.ApplyConfiguration(new RefreshTokenConfiguration());
         modelBuilder.ApplyConfiguration(new AuthorizedRangeConfiguration());
         modelBuilder.ApplyConfiguration(new AuditEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new AgentConfiguration());
+        modelBuilder.ApplyConfiguration(new EnrollmentTokenConfiguration());
 
         // snake_case columns keep hand written SQL and reports readable. xmin is a Postgres system column.
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())

@@ -6,7 +6,8 @@ public enum ErrorKind
     Unauthorized,
     Forbidden,
     NotFound,
-    Conflict
+    Conflict,
+    Unavailable
 }
 
 public sealed record ServiceError(ErrorKind Kind, string Title, IReadOnlyDictionary<string, string[]>? Errors = null);
@@ -47,6 +48,8 @@ public static class ServiceErrors
     public static ServiceError NotFound(string message) => new(ErrorKind.NotFound, message);
 
     public static ServiceError Conflict(string message) => new(ErrorKind.Conflict, message);
+
+    public static ServiceError Unavailable(string message) => new(ErrorKind.Unavailable, message);
 }
 
 public static class ServiceResultExtensions
@@ -71,6 +74,7 @@ public static class ServiceResultExtensions
             ErrorKind.Forbidden => Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: error.Title),
             ErrorKind.NotFound => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: error.Title),
             ErrorKind.Conflict => Results.Problem(statusCode: StatusCodes.Status409Conflict, title: error.Title),
+            ErrorKind.Unavailable => Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: error.Title),
             _ => Results.Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Unexpected error.")
         };
     }

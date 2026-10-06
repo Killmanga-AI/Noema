@@ -11,6 +11,12 @@ public enum ScanProbes
     Snmp = 16
 }
 
+public enum BatchDisposition
+{
+    Accepted,
+    Duplicate
+}
+
 public enum ScanStatus
 {
     Queued,
@@ -53,9 +59,35 @@ public sealed class ScanRun
     /// <summary>Who asked for the scan. Empty for scans created by the system.</summary>
     public Guid? RequestedByUserId { get; private set; }
 
+    /// <summary>When set, only this agent may run the scan. Otherwise any agent that covers the target can.</summary>
+    public Guid? RequestedAgentId { get; private set; }
+
+    public Guid? AssignedAgentId { get; private set; }
+
+    /// <summary>The agent must report before this moment or the scan is treated as abandoned.</summary>
+    public DateTimeOffset? LeaseExpiresAt { get; private set; }
+
+    public DateTimeOffset? CancelRequestedAt { get; private set; }
+
+    public long TargetsPlanned { get; private set; }
+
+    public long TargetsScanned { get; private set; }
+
+    public long HostsResponded { get; private set; }
+
+    /// <summary>The number of the last observation batch accepted, so a repeated upload is recognised.</summary>
+    public int LastBatchSequence { get; private set; }
+
+    public bool IsCancelRequested => CancelRequestedAt.HasValue && !IsTerminal;
+
     public bool IsTerminal => Status is ScanStatus.Completed or ScanStatus.Failed or ScanStatus.Cancelled;
 
-    public static ScanRun Request(CidrRange target, ScanProbes probes, DateTimeOffset requestedAt, Guid? requestedByUserId = null)
+    public static ScanRun Request(
+        CidrRange target,
+        ScanProbes probes,
+        DateTimeOffset requestedAt,
+        Guid? requestedByUserId = null,
+        Guid? requestedAgentId = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         Guard.Utc(requestedAt, nameof(requestedAt));
@@ -72,7 +104,8 @@ public sealed class ScanRun
             Probes = probes,
             Status = ScanStatus.Queued,
             RequestedAt = requestedAt,
-            RequestedByUserId = requestedByUserId
+            RequestedByUserId = requestedByUserId,
+            RequestedAgentId = requestedAgentId
         };
     }
 
@@ -85,6 +118,107 @@ public sealed class ScanRun
         Status = ScanStatus.Running;
         StartedAt = at;
     }
+
+    /// <summary>An agent takes a queued scan and starts it. The scan stays its own until it finishes or the lease runs out.</summary>
+    public void Claim(Guid agentId, DateTimeOffset at, TimeSpan lease)
+    {
+        if (agentId == Guid.Empty)
+        {
+            throw new ArgumentException("A scan is claimed by an agent.", nameof(agentId));
+        }
+
+        RequirePositive(lease);
+
+        if (RequestedAgentId is { } pinned && pinned != agentId)
+        {
+            throw new InvalidOperationException("This scan is reserved for a different agent.");
+        }
+
+        Start(at);
+        AssignedAgentId = agentId;
+        LeaseExpiresAt = at + lease;
+    }
+
+    public bool IsAssignedTo(Guid agentId) => AssignedAgentId == agentId;
+
+    /// <summary>Records the agent's progress and pushes the lease out again. Counts never go backwards.</summary>
+    public void ReportProgress(Guid agentId, DateTimeOffset at, TimeSpan lease, long targetsPlanned, long targetsScanned, long hostsResponded)
+    {
+        Guard.Utc(at, nameof(at));
+        RequireRunningFor(agentId);
+        RequirePositive(lease);
+
+        if (targetsPlanned < 0 || targetsScanned < 0 || hostsResponded < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(targetsScanned), "Counts cannot be negative.");
+        }
+
+        if (targetsScanned > targetsPlanned || hostsResponded > targetsScanned)
+        {
+            throw new ArgumentException("The counts do not add up: scanned cannot exceed planned, and answered cannot exceed scanned.");
+        }
+
+        if (targetsScanned < TargetsScanned || hostsResponded < HostsResponded)
+        {
+            throw new ArgumentException("Progress cannot go backwards.");
+        }
+
+        TargetsPlanned = targetsPlanned;
+        TargetsScanned = targetsScanned;
+        HostsResponded = hostsResponded;
+        ExtendLease(at, lease);
+    }
+
+    /// <summary>
+    /// Accepts the next batch of observations, or recognises a repeat of the last one. Anything else
+    /// means a batch was skipped, which is refused so results are never lost silently.
+    /// </summary>
+    public BatchDisposition AcceptBatch(Guid agentId, int sequence, DateTimeOffset at, TimeSpan lease)
+    {
+        Guard.Utc(at, nameof(at));
+        RequireRunningFor(agentId);
+        RequirePositive(lease);
+
+        if (sequence == LastBatchSequence && sequence > 0)
+        {
+            ExtendLease(at, lease);
+            return BatchDisposition.Duplicate;
+        }
+
+        if (sequence != LastBatchSequence + 1)
+        {
+            throw new InvalidOperationException($"Expected batch {LastBatchSequence + 1} but received {sequence}.");
+        }
+
+        LastBatchSequence = sequence;
+        ExtendLease(at, lease);
+        return BatchDisposition.Accepted;
+    }
+
+    /// <summary>
+    /// A queued scan is cancelled at once. A running scan is flagged so its agent stops at its next report.
+    /// Asking again is harmless.
+    /// </summary>
+    public void RequestCancel(DateTimeOffset at)
+    {
+        Guard.Utc(at, nameof(at));
+
+        if (IsTerminal)
+        {
+            throw new InvalidOperationException($"Cannot cancel a scan that is already {Status}.");
+        }
+
+        if (Status == ScanStatus.Queued)
+        {
+            Cancel(at);
+            return;
+        }
+
+        CancelRequestedAt ??= at;
+    }
+
+    /// <summary>Ends a running scan whose agent stopped reporting.</summary>
+    public void Abandon(DateTimeOffset at, string reason) => Fail(reason, at);
 
     public void Complete(DateTimeOffset at)
     {
@@ -122,6 +256,36 @@ public sealed class ScanRun
 
         Status = ScanStatus.Cancelled;
         FinishedAt = at;
+    }
+
+    private void ExtendLease(DateTimeOffset at, TimeSpan lease)
+    {
+        var candidate = at + lease;
+        if (LeaseExpiresAt is null || candidate > LeaseExpiresAt)
+        {
+            LeaseExpiresAt = candidate;
+        }
+    }
+
+    private void RequireRunningFor(Guid agentId)
+    {
+        if (Status != ScanStatus.Running)
+        {
+            throw new InvalidOperationException($"The scan is {Status}, not running.");
+        }
+
+        if (AssignedAgentId != agentId)
+        {
+            throw new InvalidOperationException("The scan is assigned to a different agent.");
+        }
+    }
+
+    private static void RequirePositive(TimeSpan lease)
+    {
+        if (lease <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(lease), lease, "The lease must be positive.");
+        }
     }
 
     private void RequireStatus(ScanStatus expected, string action)

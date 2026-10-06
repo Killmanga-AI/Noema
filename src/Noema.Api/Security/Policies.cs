@@ -7,6 +7,9 @@ public static class Policies
 
     /// <summary>Administrators only.</summary>
     public const string Admin = "Admin";
+
+    /// <summary>Enrolled agents, signed in with their own credential and nothing else.</summary>
+    public const string Agent = "Agent";
 }
 
 public static class RateLimitPolicies

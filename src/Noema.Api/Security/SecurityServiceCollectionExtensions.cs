@@ -2,7 +2,10 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Authentication;
+using Noema.Api.Features.Agents;
 using Noema.Api.Features.Audit;
+using Noema.Contracts;
 using Noema.Api.Features.Auth;
 using Noema.Api.Features.Ranges;
 using Noema.Api.Features.Scans;
@@ -31,14 +34,29 @@ internal static class SecurityServiceCollectionExtensions
         services.AddScoped<ScanRequestService>();
         services.AddScoped<AuditQueryService>();
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+        services.AddSingleton<IValidateOptions<AgentFleetOptions>, AgentFleetOptionsValidator>();
+        services.AddOptions<AgentFleetOptions>()
+            .BindConfiguration(AgentFleetOptions.SectionName)
+            .ValidateOnStart();
+        services.AddScoped<AgentAdminService>();
+        services.AddScoped<AgentProtocolService>();
+        services.AddSingleton<LeaseReaper>();
+        services.AddHostedService(provider => provider.GetRequiredService<LeaseReaper>());
+
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer()
+            .AddScheme<AuthenticationSchemeOptions, AgentAuthenticationHandler>(AgentProtocol.AuthenticationScheme, null);
         services.ConfigureOptions<ConfigureJwtBearer>();
 
         // Secure by default: anything without its own rule needs a signed in user.
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
             .AddPolicy(Policies.Admin, policy => policy.RequireRole("Admin"))
-            .AddPolicy(Policies.Operator, policy => policy.RequireRole("Admin", "Operator"));
+            .AddPolicy(Policies.Operator, policy => policy.RequireRole("Admin", "Operator"))
+            .AddPolicy(Policies.Agent, policy => policy
+                .AddAuthenticationSchemes(AgentProtocol.AuthenticationScheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim("role", "Agent"));
 
         services.AddRateLimiter(limiter =>
         {

@@ -34,6 +34,30 @@ internal sealed class ScanRunConfiguration : IEntityTypeConfiguration<ScanRun>
         builder.Property(s => s.Status).HasConversion<string>().HasMaxLength(16);
         builder.Property(s => s.FailureReason).HasMaxLength(ScanRun.MaxFailureReasonLength);
 
+        // Counters default to zero in the database as well, so rows written without them stay valid.
+        builder.Property(s => s.TargetsPlanned).HasDefaultValue(0L);
+        builder.Property(s => s.TargetsScanned).HasDefaultValue(0L);
+        builder.Property(s => s.HostsResponded).HasDefaultValue(0L);
+        builder.Property(s => s.LastBatchSequence).HasDefaultValue(0);
+
+        // Two agents claiming the same scan, or a claim racing a cancel, must not both win.
+        builder.Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        builder.HasOne<Agent>()
+            .WithMany()
+            .HasForeignKey(s => s.RequestedAgentId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne<Agent>()
+            .WithMany()
+            .HasForeignKey(s => s.AssignedAgentId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(s => s.AssignedAgentId).HasDatabaseName("ix_scan_runs_assigned_agent_id");
+        builder.HasIndex(s => new { s.Status, s.LeaseExpiresAt }).HasDatabaseName("ix_scan_runs_status_lease_expires_at");
         builder.HasIndex(s => s.Status).HasDatabaseName("ix_scan_runs_status");
         builder.HasIndex(s => s.RequestedAt).HasDatabaseName("ix_scan_runs_requested_at");
     }

@@ -5,6 +5,9 @@ namespace Noema.Agent;
 
 public static class ScanEngineFactory
 {
+    /// <summary>The probes this build of the agent can run. Grows as probes are added.</summary>
+    public static Noema.Domain.ScanProbes SupportedProbes => Noema.Domain.ScanProbes.Icmp;
+
     /// <summary>Builds the real engine with the probes this agent supports. The options must already be valid.</summary>
     public static ScanEngine Create(ScanningOptions options, TimeProvider time, IIcmpPinger? pinger = null)
     {

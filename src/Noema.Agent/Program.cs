@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Options;
 using Noema.Agent;
+using Noema.Agent.Credentials;
 
-// "noema-agent scan 192.168.1.0/24" runs one local scan and exits, without starting the service.
-if (ScanCommand.IsScanCommand(args))
+// "noema-agent scan ..." and "noema-agent enroll ..." run once and exit, without starting the service.
+if (ScanCommand.IsScanCommand(args) || EnrollCommand.IsEnrollCommand(args))
 {
     using var cancellation = new CancellationTokenSource();
     Console.CancelKeyPress += (_, eventArgs) =>
@@ -11,11 +12,18 @@ if (ScanCommand.IsScanCommand(args))
         cancellation.Cancel();
     };
 
-    return await ScanCommand.RunAsync(
-        args, Console.Out, Console.Error, ScanCommand.BuildConfiguration(), TimeProvider.System, cancellation.Token);
+    var configuration = ScanCommand.BuildConfiguration();
+
+    return ScanCommand.IsScanCommand(args)
+        ? await ScanCommand.RunAsync(args, Console.Out, Console.Error, configuration, TimeProvider.System, cancellation.Token)
+        : await EnrollCommand.RunAsync(args, Console.Out, Console.Error, configuration, cancellation.Token);
 }
 
 var builder = Host.CreateApplicationBuilder(args);
+
+// Local settings written by "enroll" live next to the credential, outside the install folder.
+var dataDirectory = AgentPaths.CurrentDataDirectory(builder.Configuration[$"{AgentOptions.SectionName}:DataDirectory"]);
+builder.Configuration.AddJsonFile(AgentPaths.SettingsPath(dataDirectory), optional: true, reloadOnChange: false);
 
 builder.Services.AddWindowsService(options => options.ServiceName = "NoemaAgent");
 builder.Services.AddSystemd();
@@ -26,9 +34,7 @@ builder.Services.AddOptions<AgentOptions>()
     .BindConfiguration(AgentOptions.SectionName)
     .ValidateOnStart();
 
-builder.Services.AddNoemaScanning();
-
-builder.Services.AddHostedService<HeartbeatWorker>();
+builder.Services.AddNoemaAgent(dataDirectory);
 
 await builder.Build().RunAsync();
-return 0;
+return Environment.ExitCode;

@@ -1,0 +1,46 @@
+[Unit]
+Description=Noema network scanning agent
+Documentation=https://github.com/OWNER/noema
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/opt/noema-agent/Noema.Agent
+EnvironmentFile=-/etc/noema-agent/agent.env
+Environment=DOTNET_ENVIRONMENT=Production
+Environment=NOEMA_AGENT_DATA_DIR=/var/lib/noema-agent
+
+User=noema-agent
+Group=noema-agent
+StateDirectory=noema-agent
+StateDirectoryMode=0700
+
+Restart=on-failure
+RestartSec=10
+# A revoked or unenrolled agent exits with code 1. Stop retrying after a few quick failures instead of looping forever.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Sending ping is the only privilege the agent needs.
+AmbientCapabilities=CAP_NET_RAW
+CapabilityBoundingSet=CAP_NET_RAW
+NoNewPrivileges=true
+
+# Everything else is locked down.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -500,4 +500,34 @@ public sealed class ScanEngineTests
 
         Assert.Equal(ScanProbes.Icmp | ScanProbes.Dns, engine.AvailableProbes);
     }
+
+    private sealed class InlineProgress(Action<ScanProgress> onReport) : IProgress<ScanProgress>
+    {
+        public void Report(ScanProgress value) => onReport(value);
+    }
+
+    [Fact]
+    public async Task Progress_never_claims_more_hosts_answered_than_addresses_scanned_even_under_heavy_concurrency()
+    {
+        var time = new FakeTimeProvider();
+        var violations = 0;
+        var reports = 0;
+        var progress = new InlineProgress(report =>
+        {
+            Interlocked.Increment(ref reports);
+            if (report.HostsResponded > report.TargetsScanned || report.TargetsScanned > report.TargetsPlanned)
+            {
+                Interlocked.Increment(ref violations);
+            }
+        });
+        var everyone = Enumerable.Range(1, 254).Select(i => $"192.168.1.{i}").ToArray();
+        var engine = Engine([IcmpUp(time, everyone)], time, configure: o => o.MaxConcurrency = 64);
+
+        var summary = await engine.RunAsync(Job("192.168.1.0/24"), new ListSink(), progress);
+
+        Assert.Equal(SweepOutcome.Completed, summary.Outcome);
+        Assert.Equal(254, reports);
+        Assert.Equal(0, violations);
+    }
 }
+
