@@ -54,7 +54,7 @@ jobs:
           -c Release -r ${{ matrix.rid }} --self-contained true
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
           -p:DebugType=None -o publish/${{ matrix.rid }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: noema-agent-${{ matrix.rid }}
           path: publish/${{ matrix.rid }}
