@@ -30,6 +30,10 @@ public sealed class SystemIcmpPinger : IIcmpPinger
         {
             return new IcmpReply(IcmpStatus.Error, Error: ex.InnerException?.Message ?? ex.Message);
         }
+        catch (PlatformNotSupportedException ex)
+        {
+            return new IcmpReply(IcmpStatus.Error, Error: ex.Message);
+        }
     }
 
     public static IcmpStatus Map(IPStatus status) => status switch
