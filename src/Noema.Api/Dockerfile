@@ -12,7 +12,7 @@ COPY src/Noema.Domain/ src/Noema.Domain/
 COPY src/Noema.Infrastructure/ src/Noema.Infrastructure/
 RUN dotnet publish src/Noema.Api/Noema.Api.csproj -c Release -o /app/publish --no-restore /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 ENV ASPNETCORE_HTTP_PORTS=8080
